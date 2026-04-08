@@ -83,15 +83,16 @@ if [ -z "$1" ]; then
   echo ""
   echo "Usage:"
   echo "  $0 --preset <name> [ctx-size] [--thinking]   # use a preset"
-  echo "  $0 <hf-model> [ctx-size]                     # custom model"
+  echo "  $0 <hf-model> [ctx-size] [--thinking]        # custom model"
   echo ""
   echo "Context size aliases: 8k, 16k, 32k, 64k, 128k, 256k, 512k"
   echo ""
   echo "Examples:"
-  echo "  $0 --preset gemma4-26b                       # 32k ctx, no thinking"
+  echo "  $0 --preset gemma4-26b                       # 128k ctx, no thinking"
   echo "  $0 --preset gemma4-26b 64k                   # 64k ctx"
   echo "  $0 --preset gemma4-26b 64k --thinking        # 64k ctx + thinking mode"
   echo "  $0 ggml-org/gemma-4-E4B-it-GGUF:Q4_K_M 32k"
+  echo "  $0 ggml-org/gemma-4-E4B-it-GGUF:Q4_K_M 32k --thinking"
   exit 1
 fi
 
@@ -119,10 +120,20 @@ if [ "$1" = "--preset" ]; then
 # Custom model mode
 else
   HF_MODEL="$1"
-  CTX_SIZE=$(resolve_ctx "${2:-32k}")
+  CUSTOM_CTX="32k"
+  CUSTOM_THINKING="false"
+  shift 1
+  for arg in "$@"; do
+    case "$arg" in
+      --thinking) CUSTOM_THINKING="true" ;;
+      *)          CUSTOM_CTX="$arg" ;;
+    esac
+  done
+  CTX_SIZE=$(resolve_ctx "$CUSTOM_CTX")
   echo "🚀 Starting llama-server"
   echo "   Model:             $HF_MODEL"
-  echo "   Context size:      $CTX_SIZE (${2:-32k})"
+  echo "   Context size:      $CUSTOM_CTX ($CTX_SIZE tokens)"
+  echo "   Reasoning:         $CUSTOM_THINKING"
   echo "   Performance cores: $PERF_CORES"
   echo "   GPU layers:        99 (all on Metal)"
   echo "   KV cache:          q8_0 (quantized)"
@@ -139,7 +150,7 @@ else
     -fa on \
     --cache-type-k q8_0 \
     --cache-type-v q8_0 \
-    --jinja &
+    --reasoning $([ "$CUSTOM_THINKING" = "true" ] && echo "on" || echo "off") &
   LLAMA_PID=$!
 fi
 
