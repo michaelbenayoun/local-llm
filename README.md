@@ -5,6 +5,7 @@ Run Claude Code against a local model via [llama.cpp](https://github.com/ggergan
 ## Requirements
 
 - `llama-server` (from llama.cpp, installable via `brew install llama.cpp`)
+- `jq` (installable via `brew install jq`)
 - `claude` CLI
 
 ## Usage
@@ -12,15 +13,15 @@ Run Claude Code against a local model via [llama.cpp](https://github.com/ggergan
 ### 1. Start the server
 
 ```bash
-# Recommended preset (Gemma 4 26B, 128k ctx)
+# Recommended preset (Gemma 4 26B, 64k ctx, thinking on by default)
 start-llama --preset gemma4-26b
 
 # Different context size (aliases or raw integer)
-start-llama --preset gemma4-26b 64k
+start-llama --preset gemma4-26b 128k
 start-llama --preset gemma4-26b 200000
 
-# With reasoning mode
-start-llama --preset gemma4-26b 128k --thinking
+# Disable reasoning mode
+start-llama --preset gemma4-26b --no-thinking
 
 # Any HuggingFace GGUF model
 start-llama <hf-repo:file> [ctx-size]
