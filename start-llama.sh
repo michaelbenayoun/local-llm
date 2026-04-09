@@ -18,43 +18,33 @@ resolve_ctx() {
   esac
 }
 
-# Presets
-run_preset() {
-  local name="$1"
-  local ctx=$(resolve_ctx "${2:-128k}")
-  local thinking="${3:-false}"
-
-  case "$name" in
+# Presets: set HF_MODEL, DEFAULT_CTX, and optionally EXTRA_FLAGS
+load_preset() {
+  case "$1" in
     gemma4-26b)
+      HF_MODEL="bartowski/google_gemma-4-26B-A4B-it-GGUF:Q6_K_L"
+      DEFAULT_CTX="64k"
+      EXTRA_FLAGS="--temp 1.0 --top-p 0.95 --top-k 64"
       echo "📋 Preset: Gemma 4 26B A4B (bartowski Q6_K_L)"
-      echo "   Context:           $2 ($ctx tokens)"
-      echo "   Reasoning:         $thinking"
-      echo "   KV cache:          q8_0 (quantized)"
-      echo "   Performance cores: $PERF_CORES"
-      echo ""
-      llama-server \
-        -hf bartowski/google_gemma-4-26B-A4B-it-GGUF:Q6_K_L \
-        --port "$PORT" \
-        --threads "$PERF_CORES" \
-        -ngl 99 \
-        -c "$ctx" \
-        -b 2048 \
-        -ub 1024 \
-        --parallel 1 \
-        -fa on \
-        --cache-type-k q8_0 \
-        --cache-type-v q8_0 \
-        --temp 1.0 \
-        --top-p 0.95 \
-        --top-k 64 \
-        --reasoning $([ "$thinking" = "true" ] && echo "on" || echo "off")
       ;;
     *)
-      echo "Unknown preset: $name"
+      echo "Unknown preset: $1"
       echo "Available presets: gemma4-26b"
       exit 1
       ;;
   esac
+}
+
+# Parse trailing args: optional ctx size and --no-thinking flag
+parse_trailing_args() {
+  CTX="$DEFAULT_CTX"
+  THINKING="true"
+  for arg in "$@"; do
+    case "$arg" in
+      --no-thinking) THINKING="false" ;;
+      *)             CTX="$arg" ;;
+    esac
+  done
 }
 
 # Wait for server with timeout
@@ -82,84 +72,73 @@ if [ -z "$1" ]; then
   echo "  gemma4-26b   → bartowski/google_gemma-4-26B-A4B-it-GGUF:Q6_K_L"
   echo ""
   echo "Usage:"
-  echo "  $0 --preset <name> [ctx-size] [--thinking]   # use a preset"
-  echo "  $0 <hf-model> [ctx-size] [--thinking]        # custom model"
+  echo "  $0 --preset <name> [ctx-size] [--no-thinking]   # use a preset"
+  echo "  $0 <hf-model> [ctx-size] [--no-thinking]        # custom model"
   echo ""
   echo "Context size aliases: 8k, 16k, 32k, 64k, 128k, 256k, 512k"
   echo ""
   echo "Examples:"
-  echo "  $0 --preset gemma4-26b                       # 128k ctx, no thinking"
-  echo "  $0 --preset gemma4-26b 64k                   # 64k ctx"
-  echo "  $0 --preset gemma4-26b 64k --thinking        # 64k ctx + thinking mode"
+  echo "  $0 --preset gemma4-26b                          # 64k ctx, thinking on"
+  echo "  $0 --preset gemma4-26b 64k                      # 64k ctx, thinking on"
+  echo "  $0 --preset gemma4-26b 64k --no-thinking        # 64k ctx, thinking off"
   echo "  $0 ggml-org/gemma-4-E4B-it-GGUF:Q4_K_M 32k"
-  echo "  $0 ggml-org/gemma-4-E4B-it-GGUF:Q4_K_M 32k --thinking"
   exit 1
 fi
 
 # Preset mode
 if [ "$1" = "--preset" ]; then
-  if [ -z "$2" ]; then
-    echo "Usage: $0 --preset <name> [ctx-size] [--thinking]"
-    exit 1
-  fi
-  PRESET_NAME="$2"
-  PRESET_CTX="128k"
-  PRESET_THINKING="false"
+  [ -z "$2" ] && { echo "Usage: $0 --preset <name> [ctx-size] [--thinking]"; exit 1; }
+  DEFAULT_CTX="128k"
+  EXTRA_FLAGS=""
+  load_preset "$2"
   shift 2
-  for arg in "$@"; do
-    case "$arg" in
-      --thinking) PRESET_THINKING="true" ;;
-      *)          PRESET_CTX="$arg" ;;
-    esac
-  done
-
-  echo "🚀 Starting llama-server"
-  run_preset "$PRESET_NAME" "$PRESET_CTX" "$PRESET_THINKING" &
-  LLAMA_PID=$!
-
+  parse_trailing_args "$@"
 # Custom model mode
 else
   HF_MODEL="$1"
-  CUSTOM_CTX="32k"
-  CUSTOM_THINKING="false"
+  DEFAULT_CTX="32k"
+  EXTRA_FLAGS=""
   shift 1
-  for arg in "$@"; do
-    case "$arg" in
-      --thinking) CUSTOM_THINKING="true" ;;
-      *)          CUSTOM_CTX="$arg" ;;
-    esac
-  done
-  CTX_SIZE=$(resolve_ctx "$CUSTOM_CTX")
-  echo "🚀 Starting llama-server"
-  echo "   Model:             $HF_MODEL"
-  echo "   Context size:      $CUSTOM_CTX ($CTX_SIZE tokens)"
-  echo "   Reasoning:         $CUSTOM_THINKING"
-  echo "   Performance cores: $PERF_CORES"
-  echo "   GPU layers:        99 (all on Metal)"
-  echo "   KV cache:          q8_0 (quantized)"
-  echo ""
-  llama-server \
-    -hf "$HF_MODEL" \
-    --port "$PORT" \
-    --threads "$PERF_CORES" \
-    -ngl 99 \
-    -c "$CTX_SIZE" \
-    -b 2048 \
-    -ub 1024 \
-    --parallel 1 \
-    -fa on \
-    --cache-type-k q8_0 \
-    --cache-type-v q8_0 \
-    --reasoning $([ "$CUSTOM_THINKING" = "true" ] && echo "on" || echo "off") &
-  LLAMA_PID=$!
+  parse_trailing_args "$@"
+  echo "📋 Custom model: $HF_MODEL"
 fi
+
+CTX_SIZE=$(resolve_ctx "$CTX")
+
+echo "   Context:           $CTX ($CTX_SIZE tokens)"
+echo "   Reasoning:         $THINKING"
+echo "   KV cache:          q8_0 (quantized)"
+echo "   Performance cores: $PERF_CORES"
+echo ""
 
 trap 'echo ""; echo "🛑 Shutting down llama-server..."; kill "$LLAMA_PID" 2>/dev/null; exit' INT TERM
 
+echo "🚀 Starting llama-server"
+# shellcheck disable=SC2086
+llama-server \
+  -hf "$HF_MODEL" \
+  --port "$PORT" \
+  --threads "$PERF_CORES" \
+  -ngl 99 \
+  -c "$CTX_SIZE" \
+  -b 2048 \
+  -ub 1024 \
+  --parallel 1 \
+  -fa on \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --reasoning $([ "$THINKING" = "true" ] && echo "on" || echo "off") \
+  $EXTRA_FLAGS &
+LLAMA_PID=$!
+
 wait_for_server
 
-# Get model name from server
-MODEL_ID=$(curl -s "http://127.0.0.1:$PORT/v1/models" | python3 -c "import sys,json; print(json.load(sys.stdin)['data'][0]['id'])")
+MODEL_ID=$(curl -sf "http://127.0.0.1:$PORT/v1/models" | jq -r '.data[0].id // empty' 2>/dev/null)
+if [[ -z "$MODEL_ID" ]]; then
+  echo "❌ Could not detect model ID from llama-server"
+  kill "$LLAMA_PID" 2>/dev/null
+  exit 1
+fi
 
 echo ""
 echo "✅ Server ready"

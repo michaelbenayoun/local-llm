@@ -46,3 +46,10 @@ Add to your `.zshrc`:
 alias start-llama="~/local-llm/start-llama.sh"
 source ~/local-llm/shell/cc-local.sh
 ```
+
+## References
+
+This repo was built using the following resources:
+
+- [Running Claude Code with local LLMs](https://pchalasani.github.io/claude-code-tools/integrations/local-llms/)
+- [Running Google Gemma 4 locally with llama.cpp](https://ai.georgeliu.com/p/running-google-gemma-4-locally-with)
