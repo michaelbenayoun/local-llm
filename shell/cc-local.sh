@@ -21,9 +21,9 @@ cc-local() {
   trap "rm -rf '$tmp_dir'" EXIT
 
   # Minimum files to skip the setup wizard; merge local-LLM env overrides into settings
-  jq '.env |= (. // {}) + {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"}' \
+  jq '.env |= (. // {}) + {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"} | .effortLevel = "medium"' \
     ~/.claude/settings.json > "$tmp_dir/settings.json" 2>/dev/null \
-    || echo '{"env":{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"1","CLAUDE_CODE_ATTRIBUTION_HEADER":"0"}}' > "$tmp_dir/settings.json"
+    || echo '{"effortLevel":"medium","env":{"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC":"1","CLAUDE_CODE_ATTRIBUTION_HEADER":"0"}}' > "$tmp_dir/settings.json"
   cp ~/.claude.json "$tmp_dir/.claude.json" 2>/dev/null || true
 
   # Point Claude Code at the local server. ANTHROPIC_AUTH_TOKEN is a dummy
