@@ -54,7 +54,7 @@ load_preset() {
       ;;
     *)
       echo "Unknown preset: $1"
-      echo "Available presets: gemma4-26b, gemma4-26b-uncensored, qwen3-27b"
+      echo "Available presets: gemma4-26b-a4b, gemma4-26b-a4b-uncensored, qwen3.6-27b, qwen3.6-35b-a3b-uncensored"
       exit 1
       ;;
   esac
